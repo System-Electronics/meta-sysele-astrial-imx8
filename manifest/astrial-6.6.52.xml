@@ -2,7 +2,7 @@
   <manifest>
 
   <remote fetch="https://github.com/hailocs" name="hailocs"/>
-  <remote fetch="https://github.com/System-Electronics" name="system"/>
+  <remote fetch="https://github.com/System-Electronics-Dev" name="system"/>
 
   <project name="meta-intel-realsense" remote="system" revision="scarthgap" path="sources-extra/meta-intel-realsense"/>
   <project name="meta-hailo-imx" remote="hailocs" revision="e2fed1e8a16daa6f024f815861207a2a070f2852" upstream="hailo8-scarthgap" path="sources-extra/meta-hailo"/>
