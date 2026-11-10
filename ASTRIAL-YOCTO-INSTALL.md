@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://github.com/System-Electronics/meta-sysele-nxp-5.15.71/blob/main/se_logo.png"/>
+  <img src="https://github.com/System-Electronics/meta-sysele-astrial-imx8/blob/kirkstone/se_logo.png"/>
 </p>
 
 ----
@@ -84,7 +84,7 @@ repo init -u https://github.com/nxp-imx/imx-manifest -b imx-linux-kirkstone -m i
 
 ```
 mkdir -p .repo/local_manifests
-wget --directory-prefix .repo/local_manifests https://raw.githubusercontent.com/System-Electronics/meta-sysele-nxp-5.15.71/main/manifest/astrial-5.15.71.xml
+wget --directory-prefix .repo/local_manifests https://raw.githubusercontent.com/System-Electronics/meta-sysele-astrial-imx8/kirkstone/manifest/astrial-5.15.71.xml
 ```
 
 * Sync Them all
@@ -412,7 +412,7 @@ Connected Known USB Devices
 ```
 
 ## Enable DSI
-DSI port is disabled by default. For more infomation about how to enable the display port, please see the guide [here](https://github.com/System-Electronics/meta-sysele-nxp-5.15.71/blob/main/ASTRIAL-ENABLE-DSI.md).
+DSI port is disabled by default. For more infomation about how to enable the display port, please see the guide [here](https://github.com/System-Electronics/meta-sysele-astrial-imx8/blob/kirkstone/ASTRIAL-ENABLE-DSI.md).
 
 ## Rootfs resize
 From release version 1.1.2 and above, `rootfs-resize` recipe has been introduced to expand root partition to the maximum size. To prevent possible kernel errors, be sure to run the following commands after the first boot:
@@ -422,4 +422,4 @@ reboot
 ```
 
 ## Enable cryptochip
-If you are interested to use cryptochip SE050, please see the following [guide](https://github.com/System-Electronics/meta-sysele-nxp-5.15.71/blob/main/ASTRIAL-SE05x.md).
+If you are interested to use cryptochip SE050, please see the following [guide](https://github.com/System-Electronics/meta-sysele-astrial-imx8/blob/kirkstone/ASTRIAL-SE05x.md).
