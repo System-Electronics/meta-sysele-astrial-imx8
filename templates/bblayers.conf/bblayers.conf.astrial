@@ -13,4 +13,4 @@ BBLAYERS += "${BSPDIR}/sources-extra/meta-hailo/meta-hailo-tappas"
 BBLAYERS += "${BSPDIR}/sources-extra/meta-nxp-security-reference-design/meta-secure-boot"
 
 # System Electronics layer
-BBLAYERS += "${BSPDIR}/sources-extra/meta-sysele-nxp-6.6.52"
+BBLAYERS += "${BSPDIR}/sources-extra/meta-sysele-astrial-imx8"

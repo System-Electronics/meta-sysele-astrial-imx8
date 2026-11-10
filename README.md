@@ -6,7 +6,7 @@
 
 # Yocto Layer for System Electronics SoM 'Astrial'
 
-This Yocto Project / OpenEmbedded layer **meta-sysele-nxp-6.6.52** provides
+This Yocto Project / OpenEmbedded layer **meta-sysele-astrial-imx8** provides
 the configuration and recipes used to build Linux evaluation images for
 the **System Electronics Astrial** system on module.
 
