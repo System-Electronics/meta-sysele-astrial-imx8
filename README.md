@@ -4,23 +4,45 @@
 
 ----
 
-# Yocto Layer for System Electronics SoM 'Astrial'
+# Yocto Layer for System Electronics SoM 'Astrial' (i.MX8M Plus)
 
 This Yocto Project / OpenEmbedded layer **meta-sysele-astrial-imx8** provides
-the configuration and recipes used to build Linux evaluation images for
-the **System Electronics Astrial** system on module.
+the configuration and recipes used to build Linux images for the
+**System Electronics Astrial** system on module based on the NXP i.MX8M Plus.
 
-This repository targets **Yocto Project 5.0 (Scarthgap)**.
 For an overview of the available Astrial BSP releases, documentation and
 prebuilt image downloads, see the
 [Astrial getting started guide](https://github.com/System-Electronics/astrial-howto).
+
+# Branches and releases
+
+One branch per Yocto Project release, one repository for all of them:
+
+| Branch | Yocto Project | NXP BSP | Manifest |
+|---|---|---|---|
+| `kirkstone` | 4.0 | `imx-5.15.71-2.2.0` | `manifest/astrial-5.15.71.xml` |
+| `scarthgap` | 5.0 | `imx-6.6.52-2.2.0` | `manifest/astrial-6.6.52.xml` |
+
+This branch is **`scarthgap`**. Releases are git tags `vMAJOR.MINOR.PATCH`
+(major 1 for kirkstone, 2 for scarthgap). The RAM variants of the module (2, 4
+and 8 GB) are machines of this layer (`conf/machine/`), not separate branches.
 
 # Dependencies
 
 The setup is aligned with **NXP Linux BSP `imx-6.6.52-2.2.0`**.
 
-Use the manifests and setup instructions provided by this layer to select
-the required repositories and revisions.
+Use the manifest of this branch and the setup instructions to select the
+required repositories and revisions.
+
+# Source trees
+
+| Component | Source |
+|---|---|
+| Linux kernel | [`linux-sysele-imx`](https://github.com/System-Electronics/linux-sysele-imx), branch `lf-6.6.52-2.2.0-sysele`, a fork of NXP `linux-imx` |
+| U-Boot | [`uboot-sysele-imx`](https://github.com/System-Electronics/uboot-sysele-imx), branch `lf-6.6.52-2.2.0-sysele`, a fork of NXP `uboot-imx` |
+| Arm Trusted Firmware | NXP source unchanged, plus one patch of this layer (UART1, the Astrial debug serial, in the RDC permission tables) |
+
+The recipes pin the exact revisions with `SRCREV`.
 
 # Building
 
