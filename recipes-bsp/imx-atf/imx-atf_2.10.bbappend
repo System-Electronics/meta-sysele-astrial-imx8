@@ -2,7 +2,9 @@
 # Copyright (C)2024 KOAN sas - <https://koansoftware.com>
 #
 
-# change the NXP repo with the System Electronics custom one
-ATF_SRC = "git://github.com/System-Electronics/imx-atf-lf-6.6.52;protocol=https;branch=${SRCBRANCH}"
-SRCBRANCH = "main"
-SRCREV = "85f1057108eddefa30c588b83b8beb044a59720e"
+# ATF comes from NXP unchanged (SRCREV of the NXP recipe, tree identical to lf-6.6.52-2.2.0).
+# The only System Electronics change is a patch: UART1, the Astrial debug serial, is added to
+# the RDC peripheral permission tables of the i.MX8MP.
+FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
+
+SRC_URI += "file://0001-imx8mp_bl31_setup-add-UART1-to-peripherals-permission-list.patch"
