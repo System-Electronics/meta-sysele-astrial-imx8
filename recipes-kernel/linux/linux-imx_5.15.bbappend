@@ -3,9 +3,9 @@
 #
 
 # change the NXP repo with the System Electronics custom one
-KERNEL_SRC = "git://github.com/System-Electronics/linux-imx-lf-5.15.71;protocol=https;branch=${SRCBRANCH}"
-SRCBRANCH = "main"
-SRCREV = "58eccbbf32184cd57398a614e4351a8f4c73de9d"
+KERNEL_SRC = "git://github.com/System-Electronics/linux-sysele-imx;protocol=https;branch=${SRCBRANCH}"
+SRCBRANCH = "lf-5.15.71-2.2.0-sysele"
+SRCREV = "273bcd356a161cf1d209c59f1d1712493964a858"
 
 # set local version
 LOCALVERSION = "-sysele"
