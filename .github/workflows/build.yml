@@ -19,6 +19,10 @@ concurrency:
 jobs:
   build:
     runs-on: self-hosted
+    # Il default di GitHub Actions (360 minuti) non basta: il primo run e' stato
+    # cancellato a 6h con chromium-ozone-wayland ancora in compilazione a -j4
+    # (limite deliberato per la saturazione CPU, vedi commit del fix pseudo).
+    timeout-minutes: 720
     env:
       BSP: /home/github/imx8-trial-scarthgap
       LAYER: /home/github/imx8-trial-scarthgap/sources-extra/meta-sysele-astrial-imx8
