@@ -16,12 +16,14 @@
 # functions to operate correctly with glibc 2.38 onwards").
 SRCREV = "43cbd8fb4914328094ccdb4bb827d74b1bac2046"
 
-# git:// (porta 9418) risultava bloccata/senza risposta dalla VPS al momento
-# del test (timeout su una ls-remote diretta); https sullo stesso host
-# funzionava subito. Forzare https e' comunque la scelta piu' robusta per CI,
-# indipendentemente dalla causa del blocco.
+# Causa vera del fetch fallito: il pin kirkstone punta al branch "oe-core"
+# di pseudo upstream, ma il commit del fix sta solo su "master" (merge-base
+# --is-ancestor lo confirma: non e' raggiungibile da oe-core). Scarthgap usa
+# gia' branch=master nella sua versione di questa riga: stesso schema.
+# https invece di git:// resta per robustezza (git:// risultava senza
+# risposta dalla VPS al momento del test).
 SRC_URI:remove = "git://git.yoctoproject.org/pseudo;branch=oe-core"
-SRC_URI:prepend = "git://git.yoctoproject.org/pseudo;branch=oe-core;protocol=https "
+SRC_URI:prepend = "git://git.yoctoproject.org/pseudo;branch=master;protocol=https "
 
 SRC_URI:remove = "file://0001-configure-Prune-PIE-flags.patch"
 SRC_URI:remove:class-native = "file://older-glibc-symbols.patch"
