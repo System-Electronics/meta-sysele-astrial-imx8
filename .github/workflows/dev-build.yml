@@ -1,0 +1,27 @@
+name: iMX8 scarthgap - dev build
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch/tag/sha di meta-sysele-astrial-imx8 da buildare"
+        required: false
+        default: wip/content-v2
+      sbom:
+        description: "Livello SBOM/CVE"
+        type: choice
+        options:
+          - none
+          - standard
+          - full
+        default: none
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+    with:
+      ref: ${{ inputs.ref }}
+      sbom: ${{ inputs.sbom }}

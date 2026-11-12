@@ -1,0 +1,91 @@
+name: iMX8 scarthgap - build
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: "Ref (branch/tag/sha) di meta-sysele-astrial-imx8 da buildare"
+        type: string
+        required: true
+      sbom:
+        description: "Livello SBOM/CVE (none, standard, full)"
+        type: string
+        default: none
+
+concurrency:
+  group: imx8-scarthgap-build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: self-hosted
+    env:
+      BSP: /home/github/imx8-trial-scarthgap
+      LAYER: /home/github/imx8-trial-scarthgap/sources-extra/meta-sysele-astrial-imx8
+      MACHINE: astrial-8gb-imx8mp
+      DISTRO: fsl-imx-xwayland
+    steps:
+      - name: Sincronizza meta-sysele-astrial-imx8 al ref richiesto
+        run: |
+          cd "$LAYER"
+          git fetch system "${{ inputs.ref }}"
+          git checkout --detach FETCH_HEAD
+          git clean -fdx
+          echo "Checked out: $(git rev-parse HEAD) ($(git log -1 --oneline))"
+
+      - name: Imposta livello SBOM/CVE
+        run: |
+          B="$BSP/build"
+          sed -i '/^SYSELE_SBOM /d' "$B/conf/local.conf"
+          echo 'SYSELE_SBOM = "${{ inputs.sbom }}"' >> "$B/conf/local.conf"
+
+      - name: Build system-astrial-image
+        run: |
+          cd "$BSP"
+          ulimit -n 65536
+          source astrial-setup-env build
+          bitbake system-astrial-image -k
+
+      - name: Raccogli i log in caso di fallimento
+        if: failure()
+        run: |
+          B="$BSP/build"
+          echo "--- coda bitbake-cookerdaemon.log ---"
+          tail -c 20000 "$B/bitbake-cookerdaemon.log" 2>/dev/null || true
+          echo "--- pseudo.log piu' recenti ---"
+          find "$B/tmp/work" -name pseudo.log -newer "$B/conf/local.conf" 2>/dev/null \
+            | tail -5 | xargs -r -I{} sh -c 'echo ===={}====; tail -c 4000 "{}"'
+          echo "--- disco/memoria ---"
+          df -h "$B" 2>/dev/null
+          free -h
+
+      - name: Individua e valida gli artefatti
+        id: artifacts
+        run: |
+          OUT="$BSP/build/tmp/deploy/images/$MACHINE"
+          WIC="$OUT/system-astrial-image-$MACHINE.rootfs.wic.zst"
+          SPDX="$OUT/system-astrial-image-$MACHINE.rootfs.spdx.tar.zst"
+          if [ ! -f "$WIC" ]; then
+            echo "ERRORE: immagine attesa non trovata: $WIC"
+            exit 1
+          fi
+          echo "wic=$WIC" >> "$GITHUB_OUTPUT"
+          echo "bmap=$WIC.bmap" >> "$GITHUB_OUTPUT"
+          echo "spdx=$SPDX" >> "$GITHUB_OUTPUT"
+
+      - name: Upload immagine
+        uses: actions/upload-artifact@v4
+        with:
+          name: imx8-${{ env.MACHINE }}-image
+          path: |
+            ${{ steps.artifacts.outputs.wic }}
+            ${{ steps.artifacts.outputs.bmap }}
+          retention-days: 14
+
+      - name: Upload SBOM/CVE
+        if: inputs.sbom != 'none'
+        uses: actions/upload-artifact@v4
+        with:
+          name: imx8-${{ env.MACHINE }}-sbom
+          path: ${{ steps.artifacts.outputs.spdx }}
+          retention-days: 14

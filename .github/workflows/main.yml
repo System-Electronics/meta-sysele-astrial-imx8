@@ -1,0 +1,22 @@
+name: iMX8 scarthgap - continuous build
+
+on:
+  push:
+    branches:
+      - wip/content-v2
+  schedule:
+    # Canarino bisettimanale, come H15: build senza push, solo per accorgersi
+    # presto se qualcosa a monte (NXP, poky) ha rotto la build.
+    - cron: '0 3 */14 * *'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+    with:
+      # Lo schedule non gira su un push: senza questo, ref sarebbe il branch
+      # di default del repo (oggi kirkstone), non il ramo scarthgap in corso.
+      ref: ${{ github.event_name == 'schedule' && 'wip/content-v2' || github.ref_name }}
+      sbom: none
