@@ -1,12 +1,55 @@
 
 ##########################################################
 # Avoid : ninja: build stopped: subcommand failed
+#
+# Misurato 2026-11-11/12 su scarthgap: con BB_NUMBER_THREADS=12 x PARALLEL_MAKE=-j12
+# i do_compile pesanti (chromium, onnxruntime) saturano la CPU e il bitbake-server
+# non risponde al ping interno ("No reply from server in 30s"). 8x4 ha completato
+# la build senza errori di risorse.
 ##########################################################
-#BB_NUMBER_THREADS="2"
-#PARALLEL_MAKE ?= "-j 2"
+BB_NUMBER_THREADS = "8"
+PARALLEL_MAKE = "-j 4"
 ##########################################################
 
 INHERIT += "rm_work"
+
+##########################################################
+# Distinta dei componenti e controllo CVE. Livelli: none, standard (build di tag),
+# full (aggiunge i checksum, pesa molto). Stesso schema di meta-sysele-astrial-h15.
+# Gli externalRefs (CPE) non sono qui: si dichiarano con CVE_PRODUCT nelle ricette.
+##########################################################
+SYSELE_SBOM ??= "none"
+
+INHERIT += "${@bb.utils.contains_any('SYSELE_SBOM', 'standard full', 'create-spdx cve-check', '', d)}"
+SPDX_PRETTY = "1"
+SPDX_ARCHIVE_PACKAGED = "${@bb.utils.contains('SYSELE_SBOM', 'full', '1', '0', d)}"
+
+# Tiene nel referto anche i CVE chiusi da una patch: senza, un analizzatore che
+# guarda nome e versione li segnala come aperti.
+CVE_CHECK_REPORT_PATCHED = "1"
+
+# cve-check stampa un avviso per ricetta con tutti i CVE aperti su una riga sola:
+# per il kernel sono decine di migliaia di caratteri.
+CVE_CHECK_SHOW_WARNINGS = "0"
+
+# Niente CVE per gli strumenti di build.
+CVE_CHECK_SKIP_RECIPE:append:class-native = " ${PN}"
+CVE_CHECK_SKIP_RECIPE:append:class-nativesdk = " ${PN}"
+CVE_CHECK_SKIP_RECIPE:append:class-cross = " ${PN}"
+CVE_CHECK_SKIP_RECIPE:append:class-crosssdk = " ${PN}"
+CVE_CHECK_SKIP_RECIPE:append:class-cross-canadian = " ${PN}"
+
+# Database NVD in un posto fisso, fuori da DL_DIR, per poterlo cachare con una
+# chiave sola fra dev build e release (vedi anche cve-update-nvd2-native.bbappend).
+CVE_CHECK_DB_DLDIR_FILE = "${TOPDIR}/../../yocto-cache/CVE_CHECK/${CVE_CHECK_DB_FILENAME}"
+
+# La chiave del NIST: NVDCVE_API_KEY e' il nome della ricetta, NVD_API_KEY quello
+# del secret/ambiente. Con la chiave l'attesa fra le pagine scende da 6 a 2 secondi.
+NVDCVE_API_KEY ??= "${NVD_API_KEY}"
+
+# Il NIST ogni tanto chiude la connessione a meta' di una pagina (IncompleteRead).
+CVE_DB_UPDATE_ATTEMPTS = "20"
+##########################################################
 
 ##########################################################
 # Build Info
