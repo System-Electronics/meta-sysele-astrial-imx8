@@ -29,8 +29,11 @@ jobs:
         run: |
           cd "$LAYER"
           git fetch system "${{ inputs.ref }}"
-          git checkout --detach FETCH_HEAD
+          # Pulisce prima di passare al nuovo ref: un untracked lasciato da una
+          # sessione manuale (es. un file copiato a mano) fa fallire il checkout
+          # se va a collidere con un file tracciato nel nuovo commit.
           git clean -fdx
+          git checkout --detach FETCH_HEAD
           echo "Checked out: $(git rev-parse HEAD) ($(git log -1 --oneline))"
 
       - name: Imposta livello SBOM/CVE
