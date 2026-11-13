@@ -42,10 +42,11 @@ jobs:
           git checkout --detach FETCH_HEAD
           echo "Checked out: $(git rev-parse HEAD) ($(git log -1 --oneline))"
 
-      - name: Set SBOM/CVE level
+      - name: Set MACHINE and SBOM/CVE level
         run: |
           B="$BSP/build"
-          sed -i '/^SYSELE_SBOM /d' "$B/conf/local.conf"
+          sed -i '/^MACHINE /d; /^SYSELE_SBOM /d' "$B/conf/local.conf"
+          echo "MACHINE = \"$MACHINE\"" >> "$B/conf/local.conf"
           echo 'SYSELE_SBOM = "${{ inputs.sbom }}"' >> "$B/conf/local.conf"
 
       - name: Build system-astrial-image
