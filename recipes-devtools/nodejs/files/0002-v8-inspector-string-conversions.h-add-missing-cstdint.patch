@@ -1,0 +1,29 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: System Electronics <ci@sysele.local>
+Date: Fri, 13 Nov 2026 00:00:00 +0000
+Subject: [PATCH] deps/v8/src/inspector/v8-string-conversions.h: add missing
+ <cstdint> include for GCC 13
+
+Same root cause as the fix in src/base/logging.h: GCC 13's libstdc++ no
+longer transitively pulls in <cstdint> via <string>, so uint16_t is not
+declared here either.
+
+Upstream-Status: Backport
+Signed-off-by: System Electronics <ci@sysele.local>
+---
+ deps/v8/src/inspector/v8-string-conversions.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/deps/v8/src/inspector/v8-string-conversions.h b/deps/v8/src/inspector/v8-string-conversions.h
+--- a/deps/v8/src/inspector/v8-string-conversions.h
++++ b/deps/v8/src/inspector/v8-string-conversions.h
+@@ -5,6 +5,7 @@
+ #ifndef V8_INSPECTOR_V8_STRING_CONVERSIONS_H_
+ #define V8_INSPECTOR_V8_STRING_CONVERSIONS_H_
+
++#include <cstdint>
+ #include <string>
+
+ // Conversion routines between UT8 and UTF16, used by string-16.{h,cc}. You may
+--
+2.34.1
