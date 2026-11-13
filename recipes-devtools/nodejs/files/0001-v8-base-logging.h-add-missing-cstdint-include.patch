@@ -1,0 +1,35 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: System Electronics <ci@sysele.local>
+Date: Fri, 13 Nov 2026 00:00:00 +0000
+Subject: [PATCH] deps/v8/src/base/logging.h: add missing <cstdint> include
+ for GCC 13
+
+GCC 13's libstdc++ no longer transitively pulls in <cstdint> via
+<cstring>, so the use of uint16_t in
+GetUnderlyingEnumTypeForPrinting() fails to compile with:
+
+  error: 'uint16_t' was not declared in this scope
+
+This cascades into unrelated-looking errors in src/base/macros.h,
+which includes logging.h and relied on it for the same transitive
+<cstdint>.
+
+Upstream-Status: Backport
+Signed-off-by: System Electronics <ci@sysele.local>
+---
+ deps/v8/src/base/logging.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/deps/v8/src/base/logging.h b/deps/v8/src/base/logging.h
+--- a/deps/v8/src/base/logging.h
++++ b/deps/v8/src/base/logging.h
+@@ -6,6 +6,7 @@
+ #define V8_BASE_LOGGING_H_
+
+ #include <cstring>
++#include <cstdint>
+ #include <sstream>
+ #include <string>
+
+--
+2.34.1
