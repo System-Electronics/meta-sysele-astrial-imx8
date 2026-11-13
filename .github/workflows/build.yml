@@ -1,0 +1,100 @@
+name: iMX8 - build
+
+on:
+  workflow_call:
+    inputs:
+      bsp:
+        description: "BSP/release to build (scarthgap, kirkstone)"
+        type: string
+        required: true
+      machine:
+        description: "Board variant (astrial-2gb-imx8mp, astrial-4gb-imx8mp, astrial-8gb-imx8mp)"
+        type: string
+        required: true
+      ref:
+        description: "Ref (branch/tag/sha) of meta-sysele-astrial-imx8 to build"
+        type: string
+        required: true
+      sbom:
+        description: "SBOM/CVE level (none, standard, full)"
+        type: string
+        default: none
+
+concurrency:
+  group: imx8-${{ inputs.bsp }}-build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: self-hosted
+    timeout-minutes: 720
+    env:
+      BSP: /home/github/imx8-trial-${{ inputs.bsp }}
+      LAYER: /home/github/imx8-trial-${{ inputs.bsp }}/sources-extra/meta-sysele-astrial-imx8
+      MACHINE: ${{ inputs.machine }}
+      DISTRO: fsl-imx-xwayland
+    steps:
+      - name: Sync meta-sysele-astrial-imx8 to the requested ref
+        run: |
+          cd "$LAYER"
+          git fetch system "${{ inputs.ref }}"
+          git clean -fdx
+          git checkout --detach FETCH_HEAD
+          echo "Checked out: $(git rev-parse HEAD) ($(git log -1 --oneline))"
+
+      - name: Set SBOM/CVE level
+        run: |
+          B="$BSP/build"
+          sed -i '/^SYSELE_SBOM /d' "$B/conf/local.conf"
+          echo 'SYSELE_SBOM = "${{ inputs.sbom }}"' >> "$B/conf/local.conf"
+
+      - name: Build system-astrial-image
+        run: |
+          cd "$BSP"
+          ulimit -n 65536
+          source astrial-setup-env build
+          bitbake system-astrial-image -k
+
+      - name: Collect logs on failure
+        if: failure()
+        run: |
+          B="$BSP/build"
+          echo "--- bitbake-cookerdaemon.log tail ---"
+          tail -c 20000 "$B/bitbake-cookerdaemon.log" 2>/dev/null || true
+          echo "--- most recent pseudo.log files ---"
+          find "$B/tmp/work" -name pseudo.log -newer "$B/conf/local.conf" 2>/dev/null \
+            | tail -5 | xargs -r -I{} sh -c 'echo ===={}====; tail -c 4000 "{}"'
+          echo "--- disk/memory ---"
+          df -h "$B" 2>/dev/null
+          free -h
+
+      - name: Locate and validate artifacts
+        id: artifacts
+        run: |
+          OUT="$BSP/build/tmp/deploy/images/$MACHINE"
+          WIC="$OUT/system-astrial-image-$MACHINE.rootfs.wic.zst"
+          SPDX="$OUT/system-astrial-image-$MACHINE.rootfs.spdx.tar.zst"
+          if [ ! -f "$WIC" ]; then
+            echo "ERROR: expected image not found: $WIC"
+            exit 1
+          fi
+          echo "wic=$WIC" >> "$GITHUB_OUTPUT"
+          echo "bmap=$WIC.bmap" >> "$GITHUB_OUTPUT"
+          echo "spdx=$SPDX" >> "$GITHUB_OUTPUT"
+
+      - name: Upload image
+        uses: actions/upload-artifact@v4
+        with:
+          name: imx8-${{ inputs.bsp }}-${{ env.MACHINE }}-image
+          path: |
+            ${{ steps.artifacts.outputs.wic }}
+            ${{ steps.artifacts.outputs.bmap }}
+          retention-days: 14
+
+      - name: Upload SBOM/CVE
+        if: inputs.sbom != 'none'
+        uses: actions/upload-artifact@v4
+        with:
+          name: imx8-${{ inputs.bsp }}-${{ env.MACHINE }}-sbom
+          path: ${{ steps.artifacts.outputs.spdx }}
+          retention-days: 14

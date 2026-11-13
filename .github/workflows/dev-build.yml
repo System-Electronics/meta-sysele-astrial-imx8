@@ -1,0 +1,45 @@
+name: iMX8 - dev build
+
+run-name: iMX8 Dev Build • ${{ inputs.bsp }} • ${{ inputs.machine }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      bsp:
+        description: "BSP/release to build"
+        type: choice
+        options:
+          - scarthgap
+          - kirkstone
+        required: true
+      machine:
+        description: "Board variant"
+        type: choice
+        options:
+          - astrial-2gb-imx8mp
+          - astrial-4gb-imx8mp
+          - astrial-8gb-imx8mp
+        default: astrial-8gb-imx8mp
+      ref:
+        description: "Branch/tag/sha of meta-sysele-astrial-imx8 to build. Leave empty for the bsp's own branch."
+        required: false
+      sbom:
+        description: "SBOM/CVE level"
+        type: choice
+        options:
+          - none
+          - standard
+          - full
+        default: none
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+    with:
+      bsp: ${{ inputs.bsp }}
+      machine: ${{ inputs.machine }}
+      ref: ${{ inputs.ref != '' && inputs.ref || (inputs.bsp == 'scarthgap' && 'wip/content-v2' || 'kirkstone') }}
+      sbom: ${{ inputs.sbom }}
