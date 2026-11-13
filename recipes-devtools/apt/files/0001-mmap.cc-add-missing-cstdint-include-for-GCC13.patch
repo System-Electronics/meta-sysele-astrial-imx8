@@ -1,0 +1,31 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: System Electronics <ci@sysele.local>
+Date: Fri, 13 Nov 2026 00:00:00 +0000
+Subject: [PATCH] apt-pkg/contrib/mmap.cc: add missing <cstdint> include for
+ GCC 13
+
+GCC 13's libstdc++ no longer transitively pulls in <cstdint> via
+<cstring>, so the use of uint16_t in MMap::Sync() fails to compile
+with:
+
+  error: 'uint16_t' was not declared in this scope
+
+Upstream-Status: Backport
+Signed-off-by: System Electronics <ci@sysele.local>
+---
+ apt-pkg/contrib/mmap.cc | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/apt-pkg/contrib/mmap.cc b/apt-pkg/contrib/mmap.cc
+--- a/apt-pkg/contrib/mmap.cc
++++ b/apt-pkg/contrib/mmap.cc
+@@ -24,6 +24,7 @@
+ #include <apt-pkg/mmap.h>
+
+ #include <cstring>
++#include <cstdint>
+ #include <string>
+ #include <errno.h>
+ #include <stdlib.h>
+--
+2.34.1
