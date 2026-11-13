@@ -1,0 +1,34 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: System Electronics <ci@sysele.local>
+Date: Fri, 13 Nov 2026 00:00:00 +0000
+Subject: [PATCH] Support/Signals.h: add missing <cstdint> include for GCC 13
+
+GCC 13's libstdc++ no longer transitively pulls in <cstdint> via
+<string>, so the use of uintptr_t in CleanupOnSignal() fails to
+compile with:
+
+  error: 'uintptr_t' was not declared in this scope
+
+Matches the fix applied upstream in later LLVM releases (e.g.
+llvm-project commit adding missing standard header includes for
+GCC 13 compatibility).
+
+Upstream-Status: Backport
+Signed-off-by: System Electronics <ci@sysele.local>
+---
+ llvm/include/llvm/Support/Signals.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/llvm/include/llvm/Support/Signals.h b/llvm/include/llvm/Support/Signals.h
+--- a/llvm/include/llvm/Support/Signals.h
++++ b/llvm/include/llvm/Support/Signals.h
+@@ -14,6 +14,7 @@
+ #ifndef LLVM_SUPPORT_SIGNALS_H
+ #define LLVM_SUPPORT_SIGNALS_H
+
++#include <cstdint>
+ #include <string>
+
+ namespace llvm {
+--
+2.34.1
