@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: "Branch/tag/sha di meta-sysele-astrial-imx8 da buildare"
+        description: "Branch/tag/sha of meta-sysele-astrial-imx8 to build"
         required: false
         default: wip/content-v2
       sbom:
-        description: "Livello SBOM/CVE"
+        description: "SBOM/CVE level"
         type: choice
         options:
           - none

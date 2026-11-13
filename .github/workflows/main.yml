@@ -5,8 +5,7 @@ on:
     branches:
       - wip/content-v2
   schedule:
-    # Canarino bisettimanale, come H15: build senza push, solo per accorgersi
-    # presto se qualcosa a monte (NXP, poky) ha rotto la build.
+    # Biweekly scheduled build, independent of pushes.
     - cron: '0 3 */14 * *'
 
 permissions:
@@ -16,7 +15,6 @@ jobs:
   build:
     uses: ./.github/workflows/build.yml
     with:
-      # Lo schedule non gira su un push: senza questo, ref sarebbe il branch
-      # di default del repo (oggi kirkstone), non il ramo scarthgap in corso.
+      # Scheduled runs aren't tied to a push, so resolve the ref explicitly.
       ref: ${{ github.event_name == 'schedule' && 'wip/content-v2' || github.ref_name }}
       sbom: none
