@@ -1,0 +1,45 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: System Electronics <ci@sysele.local>
+Date: Fri, 13 Nov 2026 00:00:00 +0000
+Subject: [PATCH] waflib: fix compatibility with python-3.12
+
+Python 3.12 removes the deprecated 'imp' module entirely (it had only
+been deprecated, with a warning, since 3.4/3.11), so importing waflib
+now fails before do_configure even starts:
+
+  ModuleNotFoundError: No module named 'imp'
+
+The only real usage in this old waflib snapshot is
+imp.new_module(WSCRIPT_FILE) in Context.load_module(), which is
+exactly what types.ModuleType(name) does; switch to that instead of
+'imp'.
+
+Upstream-Status: Backport
+Signed-off-by: System Electronics <ci@sysele.local>
+---
+ waflib/Context.py | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/waflib/Context.py b/waflib/Context.py
+--- a/waflib/Context.py
++++ b/waflib/Context.py
+@@ -1,7 +1,7 @@
+ #! /usr/bin/env python
+ # encoding: utf-8
+ # WARNING! Do not edit! https://waf.io/book/index.html#_obtaining_the_waf_file
+
+-import os,re,imp,sys
++import os,re,types,sys
+ from waflib import Utils,Errors,Logs
+ import waflib.Node
+@@ -338,7 +338,7 @@ def load_module(path,encoding=None):
+ 		return cache_modules[path]
+ 	except KeyError:
+ 		pass
+-	module=imp.new_module(WSCRIPT_FILE)
++	module=types.ModuleType(WSCRIPT_FILE)
+ 	try:
+ 		code=Utils.readf(path,encoding=encoding)
+ 	except EnvironmentError:
+--
+2.34.1
