@@ -1,0 +1,30 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: System Electronics <ci@sysele.local>
+Date: Fri, 13 Nov 2026 00:00:00 +0000
+Subject: [PATCH] waflib/Utils.py: mark a regex as a raw string
+
+Python emits a SyntaxWarning for the invalid escape sequence '\d' in
+this non-raw string. do_configure runs `waf --version` and parses its
+stdout for a version number; the warning text, printed to the same
+stream, gets picked up by the parser instead of the version, causing:
+
+  ValueError: invalid literal for int() with base 10: 'SyntaxWarning'
+
+Upstream-Status: Backport
+Signed-off-by: System Electronics <ci@sysele.local>
+---
+ waflib/Utils.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/waflib/Utils.py b/waflib/Utils.py
+--- a/waflib/Utils.py
++++ b/waflib/Utils.py
+@@ -411,5 +411,5 @@
+ 	if s=='cli'and os.name=='nt':
+ 		return'win32'
+-	return re.split('\d+$',s)[0]
++	return re.split(r'\d+$',s)[0]
+ def nada(*k,**kw):
+ 	pass
+--
+2.34.1
