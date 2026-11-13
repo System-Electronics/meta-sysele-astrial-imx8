@@ -73,14 +73,18 @@ jobs:
         id: artifacts
         run: |
           OUT="$BSP/build/tmp/deploy/images/$MACHINE"
-          WIC="$OUT/system-astrial-image-$MACHINE.rootfs.wic.zst"
-          SPDX="$OUT/system-astrial-image-$MACHINE.rootfs.spdx.tar.zst"
-          if [ ! -f "$WIC" ]; then
-            echo "ERROR: expected image not found: $WIC"
+          # kirkstone and scarthgap name the stable symlink differently
+          # (with or without a ".rootfs" infix), so glob instead of a fixed name.
+          find_one() { ls -t "$OUT"/system-astrial-image-"$MACHINE"*"$1" 2>/dev/null | head -1; }
+          WIC=$(find_one .wic.zst)
+          BMAP=$(find_one .wic.bmap)
+          SPDX=$(find_one .spdx.tar.zst)
+          if [ -z "$WIC" ]; then
+            echo "ERROR: no system-astrial-image-$MACHINE*.wic.zst found in $OUT"
             exit 1
           fi
           echo "wic=$WIC" >> "$GITHUB_OUTPUT"
-          echo "bmap=$WIC.bmap" >> "$GITHUB_OUTPUT"
+          echo "bmap=$BMAP" >> "$GITHUB_OUTPUT"
           echo "spdx=$SPDX" >> "$GITHUB_OUTPUT"
 
       - name: Upload image
