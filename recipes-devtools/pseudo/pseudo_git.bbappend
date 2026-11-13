@@ -1,27 +1,10 @@
-# Bug pseudo/openat2: tar >= 1.35 (Ubuntu 24.04) usa openat2(), che il pin
-# kirkstone di pseudo (1.9.0+git, prima del supporto openat2) non intercetta.
-# Stesso identico fix verificato su scarthgap (vedi commit corrispondente su
-# quel branch): bump mirato della sola SRCREV di pseudo, senza toccare il pin
-# di poky. Qui il bump di poky e' stato provato e scartato per un motivo
-# diverso da scarthgap: il bbappend OpenSSL di NXP (meta-imx/meta-bsp) applica
-# una patch proprietaria di offload hardware (CAAM, non upstream) che non
-# applica piu' pulita a partire da un certo point-release di poky piu' avanti
-# (conflitto di contenuto, non di nome file come su scarthgap). Il bump mirato
-# di pseudo evita il problema perche' non tocca openssl.
-#
-# Qui (a differenza di scarthgap) non esiste glibc238.patch: il pin di
-# pseudo di kirkstone e' piu' vecchio e non lo ha mai incluso. Le due patch
-# sotto sono gia' incluse upstream nella nuova SRCREV (stesso principio
-# verificato su scarthgap: "configure: Prune PIE flags" e "Add wrapper
-# functions to operate correctly with glibc 2.38 onwards").
+# Pin pseudo to a newer upstream commit for openat2() support (needed by
+# tar >= 1.35 on Ubuntu 24.04), without bumping the poky pin, which would
+# break NXP's proprietary OpenSSL CAAM offload patch (meta-imx/meta-bsp).
 SRCREV = "43cbd8fb4914328094ccdb4bb827d74b1bac2046"
 
-# Causa vera del fetch fallito: il pin kirkstone punta al branch "oe-core"
-# di pseudo upstream, ma il commit del fix sta solo su "master" (merge-base
-# --is-ancestor lo confirma: non e' raggiungibile da oe-core). Scarthgap usa
-# gia' branch=master nella sua versione di questa riga: stesso schema.
-# https invece di git:// resta per robustezza (git:// risultava senza
-# risposta dalla VPS al momento del test).
+# The fix commit is only reachable from pseudo's master branch, not oe-core
+# (the branch the kirkstone poky pin uses for this recipe). Fetch over https.
 SRC_URI:remove = "git://git.yoctoproject.org/pseudo;branch=oe-core"
 SRC_URI:prepend = "git://git.yoctoproject.org/pseudo;branch=master;protocol=https "
 
