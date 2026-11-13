@@ -1,8 +1,16 @@
-name: iMX8 scarthgap - build
+name: iMX8 - build
 
 on:
   workflow_call:
     inputs:
+      bsp:
+        description: "BSP/release to build (scarthgap, kirkstone)"
+        type: string
+        required: true
+      machine:
+        description: "Board variant (astrial-2gb-imx8mp, astrial-4gb-imx8mp, astrial-8gb-imx8mp)"
+        type: string
+        required: true
       ref:
         description: "Ref (branch/tag/sha) of meta-sysele-astrial-imx8 to build"
         type: string
@@ -13,7 +21,7 @@ on:
         default: none
 
 concurrency:
-  group: imx8-scarthgap-build
+  group: imx8-${{ inputs.bsp }}-build
   cancel-in-progress: false
 
 jobs:
@@ -21,9 +29,9 @@ jobs:
     runs-on: self-hosted
     timeout-minutes: 720
     env:
-      BSP: /home/github/imx8-trial-scarthgap
-      LAYER: /home/github/imx8-trial-scarthgap/sources-extra/meta-sysele-astrial-imx8
-      MACHINE: astrial-8gb-imx8mp
+      BSP: /home/github/imx8-trial-${{ inputs.bsp }}
+      LAYER: /home/github/imx8-trial-${{ inputs.bsp }}/sources-extra/meta-sysele-astrial-imx8
+      MACHINE: ${{ inputs.machine }}
       DISTRO: fsl-imx-xwayland
     steps:
       - name: Sync meta-sysele-astrial-imx8 to the requested ref
@@ -34,10 +42,11 @@ jobs:
           git checkout --detach FETCH_HEAD
           echo "Checked out: $(git rev-parse HEAD) ($(git log -1 --oneline))"
 
-      - name: Set SBOM/CVE level
+      - name: Set MACHINE and SBOM/CVE level
         run: |
           B="$BSP/build"
-          sed -i '/^SYSELE_SBOM /d' "$B/conf/local.conf"
+          sed -i '/^MACHINE /d; /^SYSELE_SBOM /d' "$B/conf/local.conf"
+          echo "MACHINE = \"$MACHINE\"" >> "$B/conf/local.conf"
           echo 'SYSELE_SBOM = "${{ inputs.sbom }}"' >> "$B/conf/local.conf"
 
       - name: Build system-astrial-image
@@ -64,20 +73,24 @@ jobs:
         id: artifacts
         run: |
           OUT="$BSP/build/tmp/deploy/images/$MACHINE"
-          WIC="$OUT/system-astrial-image-$MACHINE.rootfs.wic.zst"
-          SPDX="$OUT/system-astrial-image-$MACHINE.rootfs.spdx.tar.zst"
-          if [ ! -f "$WIC" ]; then
-            echo "ERROR: expected image not found: $WIC"
+          # kirkstone and scarthgap name the stable symlink differently
+          # (with or without a ".rootfs" infix), so glob instead of a fixed name.
+          find_one() { ls -t "$OUT"/system-astrial-image-"$MACHINE"*"$1" 2>/dev/null | head -1; }
+          WIC=$(find_one .wic.zst)
+          BMAP=$(find_one .wic.bmap)
+          SPDX=$(find_one .spdx.tar.zst)
+          if [ -z "$WIC" ]; then
+            echo "ERROR: no system-astrial-image-$MACHINE*.wic.zst found in $OUT"
             exit 1
           fi
           echo "wic=$WIC" >> "$GITHUB_OUTPUT"
-          echo "bmap=$WIC.bmap" >> "$GITHUB_OUTPUT"
+          echo "bmap=$BMAP" >> "$GITHUB_OUTPUT"
           echo "spdx=$SPDX" >> "$GITHUB_OUTPUT"
 
       - name: Upload image
         uses: actions/upload-artifact@v4
         with:
-          name: imx8-${{ env.MACHINE }}-image
+          name: imx8-${{ inputs.bsp }}-${{ env.MACHINE }}-image
           path: |
             ${{ steps.artifacts.outputs.wic }}
             ${{ steps.artifacts.outputs.bmap }}
@@ -87,6 +100,6 @@ jobs:
         if: inputs.sbom != 'none'
         uses: actions/upload-artifact@v4
         with:
-          name: imx8-${{ env.MACHINE }}-sbom
+          name: imx8-${{ inputs.bsp }}-${{ env.MACHINE }}-sbom
           path: ${{ steps.artifacts.outputs.spdx }}
           retention-days: 14

@@ -1,20 +1,53 @@
-name: iMX8 scarthgap - continuous build
+name: iMX8 - continuous build
+
+run-name: iMX8 Build • ${{ github.ref_name }} • ${{ github.event_name }}
 
 on:
   push:
     branches:
+      - kirkstone
       - wip/content-v2
   schedule:
-    # Biweekly scheduled build, independent of pushes.
-    - cron: '0 3 */14 * *'
+    # Canary builds, staggered so scarthgap and kirkstone never land on the
+    # same night on the shared self-hosted runner.
+    - cron: '0 2 2,16 * *'   # scarthgap
+    - cron: '0 2 5,19 * *'   # kirkstone
 
 permissions:
   contents: read
 
 jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      bsp: ${{ steps.resolve.outputs.bsp }}
+      ref: ${{ steps.resolve.outputs.ref }}
+    steps:
+      - name: Resolve bsp and ref for this trigger
+        id: resolve
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            if [ "${{ github.event.schedule }}" = "0 2 2,16 * *" ]; then
+              echo "bsp=scarthgap" >> "$GITHUB_OUTPUT"
+              echo "ref=wip/content-v2" >> "$GITHUB_OUTPUT"
+            else
+              echo "bsp=kirkstone" >> "$GITHUB_OUTPUT"
+              echo "ref=kirkstone" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            if [ "${{ github.ref_name }}" = "wip/content-v2" ]; then
+              echo "bsp=scarthgap" >> "$GITHUB_OUTPUT"
+            else
+              echo "bsp=kirkstone" >> "$GITHUB_OUTPUT"
+            fi
+            echo "ref=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: resolve
     uses: ./.github/workflows/build.yml
     with:
-      # Scheduled runs aren't tied to a push, so resolve the ref explicitly.
-      ref: ${{ github.event_name == 'schedule' && 'wip/content-v2' || github.ref_name }}
+      bsp: ${{ needs.resolve.outputs.bsp }}
+      machine: astrial-8gb-imx8mp
+      ref: ${{ needs.resolve.outputs.ref }}
       sbom: none
