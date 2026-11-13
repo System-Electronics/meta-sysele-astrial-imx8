@@ -4,11 +4,11 @@ on:
   workflow_call:
     inputs:
       ref:
-        description: "Ref (branch/tag/sha) di meta-sysele-astrial-imx8 da buildare"
+        description: "Ref (branch/tag/sha) of meta-sysele-astrial-imx8 to build"
         type: string
         required: true
       sbom:
-        description: "Livello SBOM/CVE (none, standard, full)"
+        description: "SBOM/CVE level (none, standard, full)"
         type: string
         default: none
 
@@ -19,9 +19,6 @@ concurrency:
 jobs:
   build:
     runs-on: self-hosted
-    # Il default di GitHub Actions (360 minuti) non basta: il primo run e' stato
-    # cancellato a 6h con chromium-ozone-wayland ancora in compilazione a -j4
-    # (limite deliberato per la saturazione CPU, vedi commit del fix pseudo).
     timeout-minutes: 720
     env:
       BSP: /home/github/imx8-trial-scarthgap
@@ -29,18 +26,15 @@ jobs:
       MACHINE: astrial-8gb-imx8mp
       DISTRO: fsl-imx-xwayland
     steps:
-      - name: Sincronizza meta-sysele-astrial-imx8 al ref richiesto
+      - name: Sync meta-sysele-astrial-imx8 to the requested ref
         run: |
           cd "$LAYER"
           git fetch system "${{ inputs.ref }}"
-          # Pulisce prima di passare al nuovo ref: un untracked lasciato da una
-          # sessione manuale (es. un file copiato a mano) fa fallire il checkout
-          # se va a collidere con un file tracciato nel nuovo commit.
           git clean -fdx
           git checkout --detach FETCH_HEAD
           echo "Checked out: $(git rev-parse HEAD) ($(git log -1 --oneline))"
 
-      - name: Imposta livello SBOM/CVE
+      - name: Set SBOM/CVE level
         run: |
           B="$BSP/build"
           sed -i '/^SYSELE_SBOM /d' "$B/conf/local.conf"
@@ -53,34 +47,34 @@ jobs:
           source astrial-setup-env build
           bitbake system-astrial-image -k
 
-      - name: Raccogli i log in caso di fallimento
+      - name: Collect logs on failure
         if: failure()
         run: |
           B="$BSP/build"
-          echo "--- coda bitbake-cookerdaemon.log ---"
+          echo "--- bitbake-cookerdaemon.log tail ---"
           tail -c 20000 "$B/bitbake-cookerdaemon.log" 2>/dev/null || true
-          echo "--- pseudo.log piu' recenti ---"
+          echo "--- most recent pseudo.log files ---"
           find "$B/tmp/work" -name pseudo.log -newer "$B/conf/local.conf" 2>/dev/null \
             | tail -5 | xargs -r -I{} sh -c 'echo ===={}====; tail -c 4000 "{}"'
-          echo "--- disco/memoria ---"
+          echo "--- disk/memory ---"
           df -h "$B" 2>/dev/null
           free -h
 
-      - name: Individua e valida gli artefatti
+      - name: Locate and validate artifacts
         id: artifacts
         run: |
           OUT="$BSP/build/tmp/deploy/images/$MACHINE"
           WIC="$OUT/system-astrial-image-$MACHINE.rootfs.wic.zst"
           SPDX="$OUT/system-astrial-image-$MACHINE.rootfs.spdx.tar.zst"
           if [ ! -f "$WIC" ]; then
-            echo "ERRORE: immagine attesa non trovata: $WIC"
+            echo "ERROR: expected image not found: $WIC"
             exit 1
           fi
           echo "wic=$WIC" >> "$GITHUB_OUTPUT"
           echo "bmap=$WIC.bmap" >> "$GITHUB_OUTPUT"
           echo "spdx=$SPDX" >> "$GITHUB_OUTPUT"
 
-      - name: Upload immagine
+      - name: Upload image
         uses: actions/upload-artifact@v4
         with:
           name: imx8-${{ env.MACHINE }}-image
