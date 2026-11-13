@@ -1,8 +1,5 @@
-# nodejs-native do_compile fallisce su Ubuntu 24.04 (GCC 13): stesso bug di
-# rust-llvm-native/apt-native/clang-native, qui nel V8 vendorizzato dentro il
-# tarball di node (deps/v8/src/base/logging.h), <cstdint> non piu' incluso
-# in modo transitivo tramite <cstring>; l'errore si propaga anche in
-# macros.h, che include logging.h.
+# Add the missing <cstdint> include required by GCC 13, in the V8 copy
+# vendored inside the node source tarball.
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 
 SRC_URI += "file://0001-v8-base-logging.h-add-missing-cstdint-include.patch"
