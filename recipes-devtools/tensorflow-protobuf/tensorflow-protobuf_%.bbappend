@@ -9,4 +9,10 @@
 # do_install:append to avoid colliding with the real protobuf at the file
 # level; keeping its own PN-based package names instead of the
 # renamed ones closes the same gap at the name level.
-DEBIAN_NAMES = "0"
+#
+# DEBIAN_NAMES = "0" is the documented way to disable this, but this BSP's
+# poky pin (yocto-4.0.4) never actually reads that variable: the rename
+# loop in debian.bbclass iterates AUTO_LIBNAME_PKGS unconditionally, which
+# defaults to ${PACKAGES}. Emptying it here is what actually has an effect
+# on this poky version (verified: DEBIAN_NAMES alone did nothing).
+AUTO_LIBNAME_PKGS = ""
