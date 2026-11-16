@@ -63,6 +63,12 @@ jobs:
   build:
     needs: resolve
     strategy:
+      # All three machines share one persistent build tree per BSP, so they
+      # cannot run concurrently: the build.yml concurrency group queues across
+      # separate runs, but does not reliably queue matrix legs within the same
+      # run (one was cancelled outright instead of queued). Force them one at
+      # a time here instead of relying on that.
+      max-parallel: 1
       matrix:
         machine: [astrial-2gb-imx8mp, astrial-4gb-imx8mp, astrial-8gb-imx8mp]
     uses: ./.github/workflows/build.yml
