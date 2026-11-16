@@ -91,7 +91,7 @@ jobs:
           path: release-files
           merge-multiple: true
 
-      - name: Download SBOM/CVE artifacts
+      - name: Download SBOM artifacts
         uses: actions/download-artifact@v4
         with:
           pattern: imx8-${{ needs.resolve.outputs.bsp }}-*-sbom
@@ -114,9 +114,13 @@ jobs:
             for f in imx-boot-*-sd.bin-flash_evk; do
               echo "- \`$f\` (+ \`.md5\`): eMMC bootloader for \`uuu\`, also the only way to recover a board with an erased bootloader"
             done
-            for f in *.spdx.tar.zst; do
+            for f in *-build.spdx.json; do
               [ -e "$f" ] || continue
-              echo "- \`$f\`: SBOM"
+              echo "- \`$f\`: SBOM, build type (includes build-time dependencies)"
+            done
+            for f in *-deployed.spdx.json; do
+              [ -e "$f" ] || continue
+              echo "- \`$f\`: SBOM, deployed type (only what's installed on the board)"
             done
             echo "CONTENTS_EOF"
           } >> "$GITHUB_OUTPUT"
