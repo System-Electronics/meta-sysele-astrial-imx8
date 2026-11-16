@@ -16,7 +16,7 @@ on:
         type: string
         required: true
       sbom:
-        description: "SBOM/CVE level (none, standard, full)"
+        description: "SBOM level (none; standard = SPDX SBOMs; full = also archives packaged source). No CVE check yet."
         type: string
         default: none
     outputs:
@@ -60,12 +60,33 @@ jobs:
           git checkout --detach FETCH_HEAD
           echo "Checked out: $(git rev-parse HEAD) ($(git log -1 --oneline))"
 
-      - name: Set MACHINE and SBOM/CVE level
+      - name: Set MACHINE and SBOM level
         run: |
           B="$BSP/build"
           sed -i '/^MACHINE /d; /^SYSELE_SBOM /d' "$B/conf/local.conf"
           echo "MACHINE = \"$MACHINE\"" >> "$B/conf/local.conf"
           echo 'SYSELE_SBOM = "${{ inputs.sbom }}"' >> "$B/conf/local.conf"
+
+          # Idempotent: this is a persistent build tree, local.conf is never
+          # reset, so strip any copy from a previous run before re-adding it.
+          #
+          # cve-check is deliberately not inherited here: this BSP's poky pin
+          # (yocto-4.0.4, Oct 2022) has an older cve-check.bbclass that reads
+          # CVE_CHECK_DB_FILE/nvdcve_1.1.db and fetches it over the network via
+          # cve-update-db-native if missing. That NVD 1.1 feed format is not
+          # what the shared VPS CVE database provides (nvdcve_2-2.db, for the
+          # newer NVD 2.0-API-based cve-check used elsewhere). Wiring it up
+          # needs its own investigation, not a copy of H15's variables.
+          sed -i \
+            -e '/^INHERIT += ".*SYSELE_SBOM/d' \
+            -e '/^SPDX_ARCHIVE_PACKAGED /d' \
+            -e '/^BUILDHISTORY_COMMIT /d' \
+            "$B/conf/local.conf"
+          cat >> "$B/conf/local.conf" <<'EOF'
+          INHERIT += "${@bb.utils.contains_any('SYSELE_SBOM', 'standard full', 'create-spdx buildhistory', '', d)}"
+          SPDX_ARCHIVE_PACKAGED = "${@bb.utils.contains('SYSELE_SBOM', 'full', '1', '0', d)}"
+          BUILDHISTORY_COMMIT = "1"
+          EOF
 
       - name: Build system-astrial-image
         run: |
@@ -73,6 +94,10 @@ jobs:
           ulimit -n 65536
           source astrial-setup-env build
           bitbake system-astrial-image -k
+
+      - name: Build the SBOMs
+        if: inputs.sbom != 'none'
+        run: bash "$LAYER/ci/build-sboms.sh" "$BSP" "$MACHINE"
 
       - name: Collect logs on failure
         if: failure()
@@ -97,6 +122,8 @@ jobs:
           WIC=$(find_one .wic.zst)
           BMAP=$(find_one .wic.bmap)
           SPDX=$(find_one .spdx.tar.zst)
+          SPDX_BUILD=$(find_one -build.spdx.json)
+          SPDX_DEPLOYED=$(find_one -deployed.spdx.json)
           if [ -z "$WIC" ]; then
             echo "ERROR: no system-astrial-image-$MACHINE*.wic.zst found in $OUT"
             exit 1
@@ -111,6 +138,8 @@ jobs:
           echo "wic=$WIC" >> "$GITHUB_OUTPUT"
           echo "bmap=$BMAP" >> "$GITHUB_OUTPUT"
           echo "spdx=$SPDX" >> "$GITHUB_OUTPUT"
+          echo "spdx_build=$SPDX_BUILD" >> "$GITHUB_OUTPUT"
+          echo "spdx_deployed=$SPDX_DEPLOYED" >> "$GITHUB_OUTPUT"
           echo "imxboot=$IMXBOOT" >> "$GITHUB_OUTPUT"
 
           # Measured, not hand-typed: read the versions actually installed
@@ -135,10 +164,12 @@ jobs:
             ${{ steps.artifacts.outputs.imxboot }}
           retention-days: 14
 
-      - name: Upload SBOM/CVE
+      - name: Upload SBOM
         if: inputs.sbom != 'none'
         uses: actions/upload-artifact@v4
         with:
           name: imx8-${{ inputs.bsp }}-${{ env.MACHINE }}-sbom
-          path: ${{ steps.artifacts.outputs.spdx }}
+          path: |
+            ${{ steps.artifacts.outputs.spdx_build }}
+            ${{ steps.artifacts.outputs.spdx_deployed }}
           retention-days: 14
