@@ -1,0 +1,148 @@
+name: iMX8 - release
+
+run-name: iMX8 Release • ${{ github.ref_name }}
+
+# A release is born only from a tag pushed by hand, with an annotated message:
+# that message becomes the changelog in the GitHub Release.
+#
+#   git tag -a v1.1.6 -m "- Bullet list of what changed in this release"
+#   git push origin v1.1.6
+#
+# Scheme: major = BSP (kirkstone 1, scarthgap 2), minor = backward-incompatible
+# change, patch = everything else. A candidate is named v1.1.6-rc1 and comes
+# out marked prerelease.
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+'
+
+permissions:
+  contents: read
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      bsp: ${{ steps.bsp.outputs.bsp }}
+      changelog: ${{ steps.changelog.outputs.text }}
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Determine the BSP from the tag's major version
+        id: bsp
+        run: |
+          MAJOR=$(echo "${{ github.ref_name }}" | sed -E 's/^v([0-9]+)\..*/\1/')
+          case "$MAJOR" in
+            1) echo "bsp=kirkstone" >> "$GITHUB_OUTPUT" ;;
+            2) echo "bsp=scarthgap" >> "$GITHUB_OUTPUT" ;;
+            *) echo "ERROR: no BSP mapped for major version $MAJOR" >&2; exit 1 ;;
+          esac
+
+      - name: Read the changelog from the annotated tag
+        id: changelog
+        run: |
+          TAG="${{ github.ref_name }}"
+          REF_SHA=$(gh api "repos/${{ github.repository }}/git/refs/tags/$TAG" --jq .object.sha)
+          REF_TYPE=$(gh api "repos/${{ github.repository }}/git/refs/tags/$TAG" --jq .object.type)
+          if [ "$REF_TYPE" != "tag" ]; then
+            echo "ERROR: $TAG is a lightweight tag with no message." >&2
+            echo "       Delete it and push an annotated tag instead: git tag -a $TAG -m '...'" >&2
+            exit 1
+          fi
+          MSG=$(gh api "repos/${{ github.repository }}/git/tags/$REF_SHA" --jq .message)
+          {
+            echo "text<<CHANGELOG_EOF"
+            echo "$MSG"
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: resolve
+    strategy:
+      matrix:
+        machine: [astrial-2gb-imx8mp, astrial-4gb-imx8mp, astrial-8gb-imx8mp]
+    uses: ./.github/workflows/build.yml
+    with:
+      bsp: ${{ needs.resolve.outputs.bsp }}
+      machine: ${{ matrix.machine }}
+      ref: ${{ github.ref_name }}
+      sbom: standard
+
+  publish:
+    needs: [resolve, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download image artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: imx8-${{ needs.resolve.outputs.bsp }}-*-image
+          path: release-files
+          merge-multiple: true
+
+      - name: Download SBOM/CVE artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: imx8-${{ needs.resolve.outputs.bsp }}-*-sbom
+          path: release-files
+          merge-multiple: true
+        continue-on-error: true
+
+      - name: Compute checksums and list contents
+        id: contents
+        run: |
+          cd release-files
+          for f in *; do
+            md5sum "$f" | awk '{print $1}' > "$f.md5"
+          done
+          {
+            echo "list<<CONTENTS_EOF"
+            for f in system-astrial-image-*.wic.zst; do
+              echo "- \`$f\` (+ \`.md5\`): compressed SD card image, write with \`bmaptool copy\`"
+            done
+            for f in imx-boot-*-sd.bin-flash_evk; do
+              echo "- \`$f\` (+ \`.md5\`): eMMC bootloader for \`uuu\`, also the only way to recover a board with an erased bootloader"
+            done
+            for f in *.spdx.tar.zst; do
+              [ -e "$f" ] || continue
+              echo "- \`$f\`: SBOM"
+            done
+            echo "CONTENTS_EOF"
+          } >> "$GITHUB_OUTPUT"
+          ls -lh
+
+      - name: Publish the release for the pushed tag
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.ref_name }}
+          target_commitish: ${{ github.sha }}
+          name: Astrial iMX8 ${{ needs.resolve.outputs.bsp }} ${{ github.ref_name }}
+          prerelease: ${{ contains(github.ref_name, '-rc') }}
+          body: |
+            ${{ needs.resolve.outputs.changelog }}
+
+            **Stack:**
+            - NXP BSP: `${{ needs.build.outputs.nxp_bsp_tag }}`
+            - Kernel: `${{ needs.build.outputs.kernel_version }}`
+            - HailoRT: `${{ needs.build.outputs.hailort_version }}`
+            - TAPPAS-Core: `${{ needs.build.outputs.tappas_version }}`
+
+            **Build Information:**
+            - Commit: ${{ github.sha }}
+            - Build Date: ${{ github.event.head_commit.timestamp }}
+
+            **Package Contents:**
+            ${{ steps.contents.outputs.list }}
+
+            Verify each file with: `md5sum -c <filename>.md5`
+
+            NXP documentation and the Yocto SDK are distributed separately, not through this release.
+            Full flashing procedure: https://github.com/System-Electronics/astrial-howto
+          files: release-files/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
