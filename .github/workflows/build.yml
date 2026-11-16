@@ -19,6 +19,19 @@ on:
         description: "SBOM/CVE level (none, standard, full)"
         type: string
         default: none
+    outputs:
+      kernel_version:
+        description: "Kernel package version actually installed in the image"
+        value: ${{ jobs.build.outputs.kernel_version }}
+      hailort_version:
+        description: "HailoRT version actually installed in the image"
+        value: ${{ jobs.build.outputs.hailort_version }}
+      tappas_version:
+        description: "TAPPAS-Core version actually installed in the image"
+        value: ${{ jobs.build.outputs.tappas_version }}
+      nxp_bsp_tag:
+        description: "meta-imx release tag the build was made against"
+        value: ${{ jobs.build.outputs.nxp_bsp_tag }}
 
 concurrency:
   group: imx8-${{ inputs.bsp }}-build
@@ -28,6 +41,11 @@ jobs:
   build:
     runs-on: self-hosted
     timeout-minutes: 720
+    outputs:
+      kernel_version: ${{ steps.artifacts.outputs.kernel_version }}
+      hailort_version: ${{ steps.artifacts.outputs.hailort_version }}
+      tappas_version: ${{ steps.artifacts.outputs.tappas_version }}
+      nxp_bsp_tag: ${{ steps.artifacts.outputs.nxp_bsp_tag }}
     env:
       BSP: /home/github/imx8-trial-${{ inputs.bsp }}
       LAYER: /home/github/imx8-trial-${{ inputs.bsp }}/sources-extra/meta-sysele-astrial-imx8
@@ -94,6 +112,18 @@ jobs:
           echo "bmap=$BMAP" >> "$GITHUB_OUTPUT"
           echo "spdx=$SPDX" >> "$GITHUB_OUTPUT"
           echo "imxboot=$IMXBOOT" >> "$GITHUB_OUTPUT"
+
+          # Measured, not hand-typed: read the versions actually installed
+          # in this build from its own manifest and layer checkout.
+          MANIFEST=$(find_one .manifest)
+          KERNEL_VER=$(awk '$1 ~ /^kernel-[0-9]/ { sub(/^kernel-/, "", $1); print $1; exit }' "$MANIFEST")
+          HAILORT_VER=$(awk '$1 == "hailortcli" { sub(/-r[0-9]+$/, "", $3); print $3; exit }' "$MANIFEST")
+          TAPPAS_VER=$(awk '$1 == "tappas-apps" { sub(/-r[0-9]+$/, "", $3); print $3; exit }' "$MANIFEST")
+          NXP_BSP_TAG=$(git -C "$BSP/sources/meta-imx" describe --tags 2>/dev/null || echo unknown)
+          echo "kernel_version=$KERNEL_VER" >> "$GITHUB_OUTPUT"
+          echo "hailort_version=$HAILORT_VER" >> "$GITHUB_OUTPUT"
+          echo "tappas_version=$TAPPAS_VER" >> "$GITHUB_OUTPUT"
+          echo "nxp_bsp_tag=$NXP_BSP_TAG" >> "$GITHUB_OUTPUT"
 
       - name: Upload image
         uses: actions/upload-artifact@v4
