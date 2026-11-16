@@ -83,9 +83,17 @@ jobs:
             echo "ERROR: no system-astrial-image-$MACHINE*.wic.zst found in $OUT"
             exit 1
           fi
+          # eMMC flashing via NXP uuu needs this bootloader binary, built
+          # alongside the image but under its own fixed name (no ".rootfs" variance).
+          IMXBOOT="$OUT/imx-boot-$MACHINE-sd.bin-flash_evk"
+          if [ ! -f "$IMXBOOT" ]; then
+            echo "ERROR: $IMXBOOT not found"
+            exit 1
+          fi
           echo "wic=$WIC" >> "$GITHUB_OUTPUT"
           echo "bmap=$BMAP" >> "$GITHUB_OUTPUT"
           echo "spdx=$SPDX" >> "$GITHUB_OUTPUT"
+          echo "imxboot=$IMXBOOT" >> "$GITHUB_OUTPUT"
 
       - name: Upload image
         uses: actions/upload-artifact@v4
@@ -94,6 +102,7 @@ jobs:
           path: |
             ${{ steps.artifacts.outputs.wic }}
             ${{ steps.artifacts.outputs.bmap }}
+            ${{ steps.artifacts.outputs.imxboot }}
           retention-days: 14
 
       - name: Upload SBOM/CVE
