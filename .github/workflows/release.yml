@@ -99,6 +99,14 @@ jobs:
           merge-multiple: true
         continue-on-error: true
 
+      - name: Download CVE report artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: imx8-${{ needs.resolve.outputs.bsp }}-*-cve
+          path: release-files
+          merge-multiple: true
+        continue-on-error: true
+
       - name: Compute checksums and list contents
         id: contents
         run: |
@@ -121,6 +129,10 @@ jobs:
             for f in *-deployed.spdx.json; do
               [ -e "$f" ] || continue
               echo "- \`$f\`: SBOM, deployed type (only what's installed on the board)"
+            done
+            for f in *-cve-summary.json; do
+              [ -e "$f" ] || continue
+              echo "- \`$f\`: CVE report for the recipes in the image"
             done
             echo "CONTENTS_EOF"
           } >> "$GITHUB_OUTPUT"
