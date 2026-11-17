@@ -24,7 +24,7 @@ on:
         description: "Branch/tag/sha of meta-sysele-astrial-imx8 to build. Leave empty for the bsp's own branch."
         required: false
       sbom:
-        description: "SBOM/CVE level"
+        description: "SBOM level. On scarthgap, standard/full also run cve-check. No CVE check on kirkstone yet."
         type: choice
         options:
           - none

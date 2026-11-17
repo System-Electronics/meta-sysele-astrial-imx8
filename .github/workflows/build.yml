@@ -16,9 +16,22 @@ on:
         type: string
         required: true
       sbom:
-        description: "SBOM/CVE level (none, standard, full)"
+        description: "SBOM level (none; standard = SPDX SBOMs; full = also archives packaged source). On scarthgap, standard/full also run cve-check. No CVE check on kirkstone yet."
         type: string
         default: none
+    outputs:
+      kernel_version:
+        description: "Kernel package version actually installed in the image"
+        value: ${{ jobs.build.outputs.kernel_version }}
+      hailort_version:
+        description: "HailoRT version actually installed in the image"
+        value: ${{ jobs.build.outputs.hailort_version }}
+      tappas_version:
+        description: "TAPPAS-Core version actually installed in the image"
+        value: ${{ jobs.build.outputs.tappas_version }}
+      nxp_bsp_tag:
+        description: "meta-imx release tag the build was made against"
+        value: ${{ jobs.build.outputs.nxp_bsp_tag }}
 
 concurrency:
   group: imx8-${{ inputs.bsp }}-build
@@ -28,6 +41,11 @@ jobs:
   build:
     runs-on: self-hosted
     timeout-minutes: 720
+    outputs:
+      kernel_version: ${{ steps.artifacts.outputs.kernel_version }}
+      hailort_version: ${{ steps.artifacts.outputs.hailort_version }}
+      tappas_version: ${{ steps.artifacts.outputs.tappas_version }}
+      nxp_bsp_tag: ${{ steps.artifacts.outputs.nxp_bsp_tag }}
     env:
       BSP: /home/github/imx8-trial-${{ inputs.bsp }}
       LAYER: /home/github/imx8-trial-${{ inputs.bsp }}/sources-extra/meta-sysele-astrial-imx8
@@ -42,12 +60,54 @@ jobs:
           git checkout --detach FETCH_HEAD
           echo "Checked out: $(git rev-parse HEAD) ($(git log -1 --oneline))"
 
-      - name: Set MACHINE and SBOM/CVE level
+      - name: Set MACHINE, SBOM and CVE-check level
         run: |
           B="$BSP/build"
           sed -i '/^MACHINE /d; /^SYSELE_SBOM /d' "$B/conf/local.conf"
           echo "MACHINE = \"$MACHINE\"" >> "$B/conf/local.conf"
           echo 'SYSELE_SBOM = "${{ inputs.sbom }}"' >> "$B/conf/local.conf"
+
+          # Idempotent: this is a persistent build tree, local.conf is never
+          # reset, so strip any copy from a previous run before re-adding it.
+          sed -i \
+            -e '/^INHERIT += ".*SYSELE_SBOM/d' \
+            -e '/^SPDX_ARCHIVE_PACKAGED /d' \
+            -e '/^BUILDHISTORY_COMMIT /d' \
+            -e '/^CVE_CHECK_/d' \
+            "$B/conf/local.conf"
+          cat >> "$B/conf/local.conf" <<'EOF'
+          INHERIT += "${@bb.utils.contains_any('SYSELE_SBOM', 'standard full', 'create-spdx buildhistory', '', d)}"
+          SPDX_ARCHIVE_PACKAGED = "${@bb.utils.contains('SYSELE_SBOM', 'full', '1', '0', d)}"
+          BUILDHISTORY_COMMIT = "1"
+          EOF
+
+          # cve-check is per BSP, not generic: each poky pin's cve-check.bbclass
+          # expects its own NVD feed format, so this is wired up one BSP at a
+          # time as each is confirmed compatible with the shared VPS database
+          # (/home/github/yocto-cache/cve-db, NVD 2.0 format, nvdcve_2-2.db).
+          case "${{ inputs.bsp }}" in
+            scarthgap)
+              # scarthgap's cve-check.bbclass already reads nvdcve_2-2.db: compatible as is.
+              cat >> "$B/conf/local.conf" <<'EOF'
+          INHERIT += "${@bb.utils.contains_any('SYSELE_SBOM', 'standard full', 'cve-check', '', d)}"
+          CVE_CHECK_DB_DLDIR_FILE = "${TOPDIR}/../../yocto-cache/cve-db/${CVE_CHECK_DB_FILENAME}"
+          CVE_CHECK_REPORT_PATCHED = "1"
+          CVE_CHECK_SHOW_WARNINGS = "0"
+          CVE_CHECK_SKIP_RECIPE:append:class-native = " ${PN}"
+          CVE_CHECK_SKIP_RECIPE:append:class-nativesdk = " ${PN}"
+          CVE_CHECK_SKIP_RECIPE:append:class-cross = " ${PN}"
+          CVE_CHECK_SKIP_RECIPE:append:class-crosssdk = " ${PN}"
+          CVE_CHECK_SKIP_RECIPE:append:class-cross-canadian = " ${PN}"
+          EOF
+              ;;
+            kirkstone)
+              # Not implemented: this BSP's poky pin (yocto-4.0.4, Oct 2022) has
+              # an older cve-check.bbclass that reads CVE_CHECK_DB_FILE/
+              # nvdcve_1.1.db, the deprecated NVD 1.1 feed, fetched over the
+              # network via cve-update-db-native if missing. That format is not
+              # what the shared VPS database provides. Needs its own investigation.
+              ;;
+          esac
 
       - name: Build system-astrial-image
         run: |
@@ -55,6 +115,10 @@ jobs:
           ulimit -n 65536
           source astrial-setup-env build
           bitbake system-astrial-image -k
+
+      - name: Build the SBOMs
+        if: inputs.sbom != 'none'
+        run: bash "$LAYER/ci/build-sboms.sh" "$BSP" "$MACHINE"
 
       - name: Collect logs on failure
         if: failure()
@@ -79,13 +143,60 @@ jobs:
           WIC=$(find_one .wic.zst)
           BMAP=$(find_one .wic.bmap)
           SPDX=$(find_one .spdx.tar.zst)
+          SPDX_BUILD=$(find_one -build.spdx.json)
+          SPDX_DEPLOYED=$(find_one -deployed.spdx.json)
           if [ -z "$WIC" ]; then
             echo "ERROR: no system-astrial-image-$MACHINE*.wic.zst found in $OUT"
+            exit 1
+          fi
+          # eMMC flashing via NXP uuu needs this bootloader binary, built
+          # alongside the image but under its own fixed name (no ".rootfs" variance).
+          IMXBOOT="$OUT/imx-boot-$MACHINE-sd.bin-flash_evk"
+          if [ ! -f "$IMXBOOT" ]; then
+            echo "ERROR: $IMXBOOT not found"
             exit 1
           fi
           echo "wic=$WIC" >> "$GITHUB_OUTPUT"
           echo "bmap=$BMAP" >> "$GITHUB_OUTPUT"
           echo "spdx=$SPDX" >> "$GITHUB_OUTPUT"
+          echo "spdx_build=$SPDX_BUILD" >> "$GITHUB_OUTPUT"
+          echo "spdx_deployed=$SPDX_DEPLOYED" >> "$GITHUB_OUTPUT"
+          echo "imxboot=$IMXBOOT" >> "$GITHUB_OUTPUT"
+
+          # cve-check writes these itself when inherited, under a fixed name
+          # with no MACHINE in it (unlike the SBOMs): copy with the machine
+          # suffixed, or the three machines' reports collide into one file
+          # once a release gathers all of them together. Absent on BSPs/
+          # levels where cve-check isn't inherited (kirkstone, or sbom=none),
+          # not an error in that case.
+          CVE_JSON="$BSP/build/tmp/log/cve/cve-summary.json"
+          CVE_TXT="$BSP/build/tmp/log/cve/cve-summary"
+          if [ -f "$CVE_JSON" ]; then
+            cp "$CVE_JSON" "$OUT/system-astrial-image-$MACHINE-cve-summary.json"
+            CVE_JSON="$OUT/system-astrial-image-$MACHINE-cve-summary.json"
+          else
+            CVE_JSON=""
+          fi
+          if [ -f "$CVE_TXT" ]; then
+            cp "$CVE_TXT" "$OUT/system-astrial-image-$MACHINE-cve-summary.txt"
+            CVE_TXT="$OUT/system-astrial-image-$MACHINE-cve-summary.txt"
+          else
+            CVE_TXT=""
+          fi
+          echo "cve_summary_json=$CVE_JSON" >> "$GITHUB_OUTPUT"
+          echo "cve_summary_txt=$CVE_TXT" >> "$GITHUB_OUTPUT"
+
+          # Measured, not hand-typed: read the versions actually installed
+          # in this build from its own manifest and layer checkout.
+          MANIFEST=$(find_one .manifest)
+          KERNEL_VER=$(awk '$1 ~ /^kernel-[0-9]/ { sub(/^kernel-/, "", $1); print $1; exit }' "$MANIFEST")
+          HAILORT_VER=$(awk '$1 == "hailortcli" { sub(/-r[0-9]+$/, "", $3); print $3; exit }' "$MANIFEST")
+          TAPPAS_VER=$(awk '$1 == "tappas-apps" { sub(/-r[0-9]+$/, "", $3); print $3; exit }' "$MANIFEST")
+          NXP_BSP_TAG=$(git -C "$BSP/sources/meta-imx" describe --tags 2>/dev/null || echo unknown)
+          echo "kernel_version=$KERNEL_VER" >> "$GITHUB_OUTPUT"
+          echo "hailort_version=$HAILORT_VER" >> "$GITHUB_OUTPUT"
+          echo "tappas_version=$TAPPAS_VER" >> "$GITHUB_OUTPUT"
+          echo "nxp_bsp_tag=$NXP_BSP_TAG" >> "$GITHUB_OUTPUT"
 
       - name: Upload image
         uses: actions/upload-artifact@v4
@@ -94,12 +205,25 @@ jobs:
           path: |
             ${{ steps.artifacts.outputs.wic }}
             ${{ steps.artifacts.outputs.bmap }}
+            ${{ steps.artifacts.outputs.imxboot }}
           retention-days: 14
 
-      - name: Upload SBOM/CVE
+      - name: Upload SBOM
         if: inputs.sbom != 'none'
         uses: actions/upload-artifact@v4
         with:
           name: imx8-${{ inputs.bsp }}-${{ env.MACHINE }}-sbom
-          path: ${{ steps.artifacts.outputs.spdx }}
+          path: |
+            ${{ steps.artifacts.outputs.spdx_build }}
+            ${{ steps.artifacts.outputs.spdx_deployed }}
+          retention-days: 14
+
+      - name: Upload CVE report
+        if: steps.artifacts.outputs.cve_summary_json != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: imx8-${{ inputs.bsp }}-${{ env.MACHINE }}-cve
+          path: |
+            ${{ steps.artifacts.outputs.cve_summary_json }}
+            ${{ steps.artifacts.outputs.cve_summary_txt }}
           retention-days: 14
