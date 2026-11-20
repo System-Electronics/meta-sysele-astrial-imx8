@@ -16,7 +16,7 @@ on:
         type: string
         required: true
       sbom:
-        description: "SBOM level (none; standard = SPDX SBOMs; full = also archives packaged source). On scarthgap, standard/full also run cve-check. No CVE check on kirkstone yet."
+        description: "SBOM level (none; standard = SPDX SBOMs; full = also archives packaged source). On scarthgap, standard/full also run cve-check. No CVE check on kirkstone: known limitation, see the case statement below."
         type: string
         default: none
     outputs:
@@ -101,11 +101,14 @@ jobs:
           EOF
               ;;
             kirkstone)
-              # Not implemented: this BSP's poky pin (yocto-4.0.4, Oct 2022) has
-              # an older cve-check.bbclass that reads CVE_CHECK_DB_FILE/
-              # nvdcve_1.1.db, the deprecated NVD 1.1 feed, fetched over the
-              # network via cve-update-db-native if missing. That format is not
-              # what the shared VPS database provides. Needs its own investigation.
+              # Known limitation, not planned: this BSP's poky pin (yocto-4.0.4,
+              # Oct 2022) has an older cve-check.bbclass that reads
+              # CVE_CHECK_DB_FILE/nvdcve_1.1.db, the NVD 1.1 feed. NVD retired
+              # that feed in 2023, and the shared VPS database is NVD 2.0
+              # (nvdcve_2-2.db, used by scarthgap above), so neither the
+              # automatic fetch nor the shared database can feed this class.
+              # kirkstone is near Yocto LTS end of life; revisit only if a
+              # customer still on it asks for a CVE check.
               ;;
           esac
 
