@@ -6,7 +6,7 @@ on:
   push:
     branches:
       - kirkstone
-      - wip/content-v2
+      - scarthgap
   schedule:
     # Canary builds, staggered so scarthgap and kirkstone never land on the
     # same night on the shared self-hosted runner.
@@ -25,23 +25,20 @@ jobs:
     steps:
       - name: Resolve bsp and ref for this trigger
         id: resolve
+        # The branch names match the bsp names, so a push's own ref_name is
+        # both already; only a schedule has no ref_name and needs the cron to say which.
         run: |
           if [ "${{ github.event_name }}" = "schedule" ]; then
             if [ "${{ github.event.schedule }}" = "0 2 2,16 * *" ]; then
-              echo "bsp=scarthgap" >> "$GITHUB_OUTPUT"
-              echo "ref=wip/content-v2" >> "$GITHUB_OUTPUT"
+              BSP=scarthgap
             else
-              echo "bsp=kirkstone" >> "$GITHUB_OUTPUT"
-              echo "ref=kirkstone" >> "$GITHUB_OUTPUT"
+              BSP=kirkstone
             fi
           else
-            if [ "${{ github.ref_name }}" = "wip/content-v2" ]; then
-              echo "bsp=scarthgap" >> "$GITHUB_OUTPUT"
-            else
-              echo "bsp=kirkstone" >> "$GITHUB_OUTPUT"
-            fi
-            echo "ref=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+            BSP="${{ github.ref_name }}"
           fi
+          echo "bsp=$BSP" >> "$GITHUB_OUTPUT"
+          echo "ref=$BSP" >> "$GITHUB_OUTPUT"
 
   build:
     needs: resolve
