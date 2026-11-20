@@ -41,5 +41,6 @@ jobs:
     with:
       bsp: ${{ inputs.bsp }}
       machine: ${{ inputs.machine }}
-      ref: ${{ inputs.ref != '' && inputs.ref || (inputs.bsp == 'scarthgap' && 'wip/content-v2' || 'kirkstone') }}
+      # The branch names match the bsp names, so the bsp's own branch is the bsp itself.
+      ref: ${{ inputs.ref != '' && inputs.ref || inputs.bsp }}
       sbom: ${{ inputs.sbom }}
