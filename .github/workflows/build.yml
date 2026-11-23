@@ -63,9 +63,13 @@ jobs:
       - name: Set MACHINE, SBOM and CVE-check level
         run: |
           B="$BSP/build"
-          sed -i '/^MACHINE /d; /^SYSELE_SBOM /d' "$B/conf/local.conf"
+          sed -i '/^MACHINE /d; /^SYSELE_SBOM /d; /^SYSELE_BSP_VERSION /d' "$B/conf/local.conf"
           echo "MACHINE = \"$MACHINE\"" >> "$B/conf/local.conf"
           echo 'SYSELE_SBOM = "${{ inputs.sbom }}"' >> "$B/conf/local.conf"
+          # The ref this build was actually given: a release tag on a tagged
+          # release, a branch name on a dev/continuous build. Ends up in
+          # /etc/os-release as ASTRIAL_VERSION.
+          echo 'SYSELE_BSP_VERSION = "${{ inputs.ref }}"' >> "$B/conf/local.conf"
 
           # Idempotent: this is a persistent build tree, local.conf is never
           # reset, so strip any copy from a previous run before re-adding it.
