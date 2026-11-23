@@ -146,11 +146,15 @@ jobs:
               echo "::error::No image files found for $MACHINE" >&2
               exit 1
             fi
-            tar -czf "../packages/$IMAGE_PKG" "${PRESENT_IMAGE[@]}"
+            # Insert the tag right before each file's own extension (its first
+            # dot), so extracting several releases into the same folder no
+            # longer collides their members into one filename.
+            TRANSFORM="s/^\([^.]*\)\./\1-${TAG}./"
+            tar --transform="$TRANSFORM" -czf "../packages/$IMAGE_PKG" "${PRESENT_IMAGE[@]}"
             echo "- \`$IMAGE_PKG\` (+ \`.md5\`): $MACHINE SD card image (write with \`bmaptool copy\`) and eMMC bootloader for \`uuu\`" >> /tmp/contents.md
 
             if [ "${#PRESENT_SBOM[@]}" -gt 0 ]; then
-              tar -czf "../packages/$SBOM_PKG" "${PRESENT_SBOM[@]}"
+              tar --transform="$TRANSFORM" -czf "../packages/$SBOM_PKG" "${PRESENT_SBOM[@]}"
               echo "- \`$SBOM_PKG\` (+ \`.md5\`): $MACHINE SBOM (build + deployed, SPDX 2.2) and CVE report" >> /tmp/contents.md
             fi
             cd ..

@@ -47,6 +47,17 @@ IMAGE_INSTALL:append = " opencv opencv-dev libopencv-core-dev libopencv-highgui-
 #IMAGE_INSTALL:append = " keyctl-caam se05x"
 
 #################################################################################################################
+## Standard, lsb_release-readable place for what was actually built: the ref
+## the CI build was given (a release tag, or a branch name on a dev/continuous
+## build), same value the build already resolves as SYSELE_BSP_VERSION.
+SYSELE_BSP_VERSION ?= "unreleased"
+ROOTFS_POSTPROCESS_COMMAND += "sysele_write_os_release; "
+
+sysele_write_os_release () {
+    echo 'ASTRIAL_VERSION="${SYSELE_BSP_VERSION}"' >> ${IMAGE_ROOTFS}${sysconfdir}/os-release
+}
+
+#################################################################################################################
 ## Tools Extra
 IMAGE_INSTALL:append = " git joe du-dust python3-shtab python3-tldr custom-shell dtc python3-pyqt6 chromium-ozone-wayland"
 
