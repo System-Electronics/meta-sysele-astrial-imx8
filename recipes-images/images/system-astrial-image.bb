@@ -51,9 +51,9 @@ IMAGE_INSTALL:append = " opencv opencv-dev libopencv-core-dev libopencv-highgui-
 ## the CI build was given (a release tag, or a branch name on a dev/continuous
 ## build), same value the build already resolves as SYSELE_BSP_VERSION.
 SYSELE_BSP_VERSION ?= "unreleased"
-ROOTFS_POSTPROCESS_COMMAND += "sysele_append_os_release; "
+ROOTFS_POSTPROCESS_COMMAND += "sysele_write_os_release; "
 
-sysele_append_os_release () {
+sysele_write_os_release () {
     echo 'ASTRIAL_VERSION="${SYSELE_BSP_VERSION}"' >> ${IMAGE_ROOTFS}${sysconfdir}/os-release
 }
 
